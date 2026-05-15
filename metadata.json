@@ -1,0 +1,8 @@
+{
+  "name": "Name Teller",
+  "description": "A modern, futuristic app that tells you your name with voice output and smooth animations. Inspired by high-end Android experiences.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
