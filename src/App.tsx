@@ -1,296 +1,178 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+import React, { useEffect, useState } from 'react';
+import Phaser from 'phaser';
+import MainScene from './game/MainScene';
+import { GAME_CONFIG } from './game/constants';
+import { Heart, Zap, Crosshair, Trophy, Pause } from 'lucide-react';
 
-/**
- * NAME TELLER - Modern Android-Style Web App
- * 
- * Features:
- * - Futuristic Glassmorphism UI (Tailwind CSS)
- * - Smooth Animations (Motion)
- * - Text-to-Speech (Web Speech API)
- * - Local Storage Persistence
- * - Responsive Mobile-First Design
- * 
- * To convert to a native Android APK:
- * 1. Initialize Capacitor: `npx cap init`
- * 2. Add Android platform: `npx cap add android`
- * 3. Build the web app: `npm run build`
- * 4. Sync code: `npx cap sync`
- * 5. Open in Android Studio and Build APK.
- */
+const App: React.FC = () => {
+  const [health, setHealth] = useState(100);
+  const [fuel, setFuel] = useState(100);
+  const [ammo, setAmmo] = useState(30);
+  const [kills, setKills] = useState(0);
+  const [game, setGame] = useState<Phaser.Game | null>(null);
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { User, Sparkles, Volume2, ArrowRight, RefreshCw, Smartphone } from 'lucide-react';
-
-// --- Types ---
-type AppState = 'welcome' | 'input' | 'result';
-
-export default function App() {
-  const [state, setState] = useState<AppState>('welcome');
-  const [name, setName] = useState('');
-  const [submittedName, setSubmittedName] = useState('');
-  const [error, setError] = useState('');
-  const [isSpeaking, setIsSpeaking] = useState(false);
-
-  // --- Initialization & Local Storage ---
   useEffect(() => {
-    const savedName = localStorage.getItem('name_teller_last_name');
-    if (savedName) {
-      setName(savedName);
-    }
+    const config: Phaser.Types.Core.GameConfig = {
+      type: Phaser.AUTO,
+      parent: 'game-container',
+      ...GAME_CONFIG,
+      scene: [MainScene],
+      scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+      }
+    };
 
-    // Auto-advance from welcome screen after 2 seconds
-    const timer = setTimeout(() => {
-      setState('input');
-    }, 2500);
+    const newGame = new Phaser.Game(config);
+    setGame(newGame);
 
-    return () => clearTimeout(timer);
+    // Listen for events from Phaser
+    const handleReady = () => {
+      const scene = newGame.scene.getScene('MainScene') as MainScene;
+      if (scene) {
+        scene.events.on('update-health', (val: number) => setHealth(val));
+        scene.events.on('update-fuel', (val: number) => setFuel(val));
+        scene.events.on('update-ammo', (val: number) => setAmmo(val));
+        scene.events.on('update-kills', (val: number) => setKills(val));
+      }
+    };
+
+    newGame.events.on('ready', handleReady);
+
+    return () => {
+      newGame.destroy(true);
+    };
   }, []);
-
-  // --- Voice Output ---
-  const speak = useCallback((text: string) => {
-    if (!('speechSynthesis' in window)) return;
-    
-    // Stop any existing speech
-    window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-
-    window.speechSynthesis.speak(utterance);
-  }, []);
-
-  // --- Handlers ---
-  const handleTellMeMyName = () => {
-    if (!name.trim()) {
-      setError('Please enter your name');
-      triggerHaptic();
-      return;
-    }
-
-    setError('');
-    setSubmittedName(name.trim());
-    localStorage.setItem('name_teller_last_name', name.trim());
-    setState('result');
-    triggerHaptic();
-    
-    // Slight delay for voice to feel natural with animation
-    setTimeout(() => {
-      speak(`Hello, your name is ${name.trim()}`);
-    }, 500);
-  };
-
-  const handleReset = () => {
-    setState('input');
-    triggerHaptic();
-  };
-
-  const triggerHaptic = () => {
-    if ('vibrate' in navigator) {
-      navigator.vibrate(50);
-    }
-  };
-
-  // --- Animation Variants ---
-  const pageVariants = {
-    initial: { opacity: 0, y: 20 },
-    enter: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
-    exit: { opacity: 0, y: -20, transition: { duration: 0.4 } }
-  };
 
   return (
-    <div className="min-h-screen gradient-bg flex flex-col items-center justify-center p-6 text-zinc-100 font-sans">
-      <AnimatePresence mode="wait">
-        
-        {/* --- Welcome / Splash Screen --- */}
-        {state === 'welcome' && (
-          <motion.div
-            key="welcome"
-            variants={pageVariants}
-            initial="initial"
-            animate="enter"
-            exit="exit"
-            className="flex flex-col items-center text-center space-y-6"
-          >
-            <div className="relative">
-              <motion.div
-                animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                className="w-24 h-24 glass rounded-full flex items-center justify-center shadow-2xl shadow-indigo-500/20"
-              >
-                <Smartphone className="w-12 h-12 text-indigo-400" />
-              </motion.div>
-              <motion.div
-                animate={{ opacity: [0, 1, 0], scale: [0.8, 1.2, 0.8] }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className="absolute -top-2 -right-2"
-              >
-                <Sparkles className="w-6 h-6 text-purple-400" />
-              </motion.div>
+    <div className="relative w-full h-screen bg-slate-900 overflow-hidden font-sans">
+      {/* Game Container */}
+      <div id="game-container" className="w-full h-full" />
+
+      {/* HUD Overlay */}
+      <div className="absolute top-0 left-0 w-full p-4 flex justify-between items-start pointer-events-none">
+        {/* Left Stats: Health & Fuel */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-3 bg-black/40 backdrop-blur-md p-2 rounded-lg border border-white/10 w-64 shadow-xl">
+            <Heart className="text-red-500 fill-red-500 animate-pulse" size={24} />
+            <div className="flex-1 h-4 bg-gray-800 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-red-600 to-red-400 transition-all duration-300"
+                style={{ width: `${health}%` }}
+              />
             </div>
-            <div>
-              <h1 className="text-4xl font-display font-bold tracking-tight bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-                Name Teller
-              </h1>
-              <p className="mt-2 text-zinc-400 font-light tracking-wide uppercase text-xs">
-                Futuristic Personal Identity
-              </p>
+            <span className="text-white font-bold text-sm min-w-[3ch]">{Math.ceil(health)}</span>
+          </div>
+
+          <div className="flex items-center gap-3 bg-black/40 backdrop-blur-md p-2 rounded-lg border border-white/10 w-64 shadow-xl">
+            <Zap className="text-yellow-400 fill-yellow-400" size={24} />
+            <div className="flex-1 h-4 bg-gray-800 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-yellow-500 to-yellow-300 transition-all duration-300"
+                style={{ width: `${fuel}%` }}
+              />
             </div>
-            <div className="w-12 h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent rounded-full opacity-50" />
-          </motion.div>
-        )}
+            <span className="text-white font-bold text-sm min-w-[3ch]">{Math.ceil(fuel)}</span>
+          </div>
+        </div>
 
-        {/* --- Input Screen --- */}
-        {state === 'input' && (
-          <motion.div
-            key="input"
-            variants={pageVariants}
-            initial="initial"
-            animate="enter"
-            exit="exit"
-            className="w-full max-w-md h-full flex flex-col space-y-8"
-          >
-            <div className="space-y-2">
-              <h2 className="text-3xl font-display font-bold">Welcome Back</h2>
-              <p className="text-zinc-400">Discover your identity in style.</p>
+        {/* Right Stats: Ammo & Score */}
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-3 bg-black/40 backdrop-blur-md px-4 py-2 rounded-lg border border-white/10 shadow-xl">
+            <div className="text-right">
+              <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">Active Weapon</p>
+              <p className="text-white font-bold text-lg leading-tight uppercase">Assault Rifle</p>
             </div>
-
-            <div className="glass rounded-3xl p-8 space-y-6 shadow-xl shadow-black/40">
-              <div className="space-y-4">
-                <label htmlFor="name-input" className="block text-xs font-medium uppercase tracking-widest text-zinc-500">
-                  Enter Your Name
-                </label>
-                <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <User className={`w-5 h-5 transition-colors ${error ? 'text-rose-500' : 'text-indigo-400'}`} />
-                  </div>
-                  <input
-                    id="name-input"
-                    type="text"
-                    value={name}
-                    onChange={(e) => {
-                      setName(e.target.value);
-                      if (error) setError('');
-                    }}
-                    placeholder="Your name here..."
-                    className={`w-full bg-white/5 border-2 ${error ? 'border-rose-500/50 bg-rose-500/5' : 'border-white/10 focus:border-indigo-500/50'} rounded-2xl py-4 pl-12 pr-4 outline-none transition-all duration-300 font-medium placeholder:text-zinc-600`}
-                  />
-                  {error && (
-                    <motion.p
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="mt-2 text-rose-500 text-sm font-medium"
-                    >
-                      {error}
-                    </motion.p>
-                  )}
-                </div>
-              </div>
-
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleTellMeMyName}
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-4 rounded-2xl flex items-center justify-center space-x-2 shadow-lg shadow-indigo-600/20 transition-all duration-300"
-              >
-                <span>Tell Me My Name</span>
-                <ArrowRight className="w-5 h-5" />
-              </motion.button>
+            <div className="w-px h-8 bg-white/20 mx-2" />
+            <div className="flex flex-col items-center">
+               <Crosshair className="text-blue-400" size={20} />
+               <span className="text-white font-mono text-xl font-bold">{ammo}/∞</span>
             </div>
+          </div>
 
-            {/* Hint for return users */}
-            {localStorage.getItem('name_teller_last_name') && (
-              <p className="text-center text-xs text-zinc-500">
-                Found your previous name automatically.
-              </p>
-            )}
-          </motion.div>
-        )}
-
-        {/* --- Result Screen --- */}
-        {state === 'result' && (
-          <motion.div
-            key="result"
-            variants={pageVariants}
-            initial="initial"
-            animate="enter"
-            exit="exit"
-            className="w-full max-w-md space-y-8"
-          >
-            <div className="flex flex-col items-center space-y-6">
-              {/* Avatar */}
-              <motion.div
-                initial={{ scale: 0, rotate: -20 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                className="w-32 h-32 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-5xl font-display font-bold shadow-2xl shadow-indigo-500/40 border-4 border-white/10"
-              >
-                {submittedName.charAt(0).toUpperCase()}
-              </motion.div>
-
-              <div className="text-center space-y-4">
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  <p className="text-zinc-500 uppercase tracking-[0.3em] text-xs font-semibold">Discovery Complete</p>
-                  <h2 className="text-4xl font-display font-bold mt-2">
-                    Your name is
-                  </h2>
-                </motion.div>
-                
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.5, type: "spring" }}
-                  className="px-8 py-4 glass rounded-3xl inline-block"
-                >
-                  <span className="text-5xl font-display font-black bg-gradient-to-r from-indigo-400 via-white to-purple-400 bg-clip-text text-transparent">
-                    {submittedName}
-                  </span>
-                </motion.div>
-              </div>
-
-              <div className="flex flex-col w-full space-y-4 pt-8">
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => speak(`Hello, your name is ${submittedName}`)}
-                  disabled={isSpeaking}
-                  className={`w-full py-4 rounded-2xl flex items-center justify-center space-x-2 border-2 transition-all duration-300 ${isSpeaking ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-300' : 'bg-white/5 border-white/10 hover:bg-white/10 text-white'}`}
-                >
-                  <Volume2 className={`w-5 h-5 ${isSpeaking ? 'animate-pulse' : ''}`} />
-                  <span>{isSpeaking ? 'Speaking...' : 'Play Voice'}</span>
-                </motion.button>
-
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleReset}
-                  className="w-full bg-zinc-100 text-zinc-900 font-bold py-4 rounded-2xl flex items-center justify-center space-x-2 hover:bg-white transition-all duration-300"
-                >
-                  <RefreshCw className="w-5 h-5" />
-                  <span>Try Another</span>
-                </motion.button>
-              </div>
+          <div className="flex items-center gap-4 bg-black/40 backdrop-blur-md px-4 py-2 rounded-lg border border-white/10">
+            <div className="flex items-center gap-2">
+              <Trophy className="text-yellow-500" size={18} />
+              <span className="text-white font-bold uppercase tracking-wider">KILLS: {kills}</span>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* --- Footer Decoration --- */}
-      <div className="fixed bottom-8 left-0 right-0 flex justify-center pointer-events-none opacity-20">
-        <div className="w-32 h-1 bg-white rounded-full" />
+          </div>
+        </div>
       </div>
+
+      {/* MiniMap Mockup */}
+      <div className="absolute bottom-6 right-6 w-40 h-40 bg-black/60 backdrop-blur-md border border-white/10 rounded-xl overflow-hidden pointer-events-none shadow-2xl">
+         <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,_white_1px,_transparent_1px)] bg-[size:20px_20px]" />
+         <div className="absolute top-1/2 left-1/2 w-2 h-2 bg-green-500 rounded-full -translate-x-1/2 -translate-y-1/2 shadow-[0_0_10px_#22c55e]" />
+      </div>
+
+      {/* Mobile Controls Mockup Overlay (Visible only on touch) */}
+      <div className="absolute bottom-8 left-8 flex gap-4 md:hidden pointer-events-none">
+         <div className="w-32 h-32 bg-white/10 backdrop-blur-md rounded-full border border-white/20 flex items-center justify-center">
+            <div className="w-12 h-12 bg-white/30 rounded-full" />
+         </div>
+      </div>
+      
+      <div className="absolute bottom-8 right-8 flex flex-col items-end gap-4 md:hidden pointer-events-none">
+         <div className="w-32 h-32 bg-white/10 backdrop-blur-md rounded-full border border-white/20 flex items-center justify-center">
+            <div className="w-12 h-12 bg-white/30 rounded-full" />
+         </div>
+         <div className="w-16 h-16 bg-red-500/30 backdrop-blur-md rounded-full border border-red-500/50 flex items-center justify-center">
+            <Zap className="text-white" size={24} />
+         </div>
+      </div>
+
+      {/* Top Center: Room Info */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/40 backdrop-blur-md px-4 py-1 rounded-full border border-white/10 shadow-xl flex items-center gap-4 pointer-events-none">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+          <span className="text-white/60 text-xs font-medium tracking-widest uppercase">Room: Lobby-1</span>
+        </div>
+        <div className="w-px h-4 bg-white/10" />
+        <span className="text-white/80 text-xs font-bold uppercase">Map: Outpost-X</span>
+      </div>
+
+      {/* Intro Overlay */}
+      <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center z-50 pointer-events-auto transition-opacity duration-1000 animate-in fade-out fill-mode-forwards delay-[4000ms]">
+        <h1 className="text-7xl font-black text-white italic tracking-tighter uppercase mb-2">
+          Outpost <span className="text-blue-500">Arena</span>
+        </h1>
+        <p className="text-blue-400/60 font-mono tracking-[0.3em] uppercase text-sm mb-12">Tactical Multiplayer Combat</p>
+        
+        <div className="grid grid-cols-2 gap-8 mb-12 text-white/80">
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-[10px] text-blue-400 uppercase tracking-widest font-bold">Movement</span>
+            <div className="flex gap-2 font-mono text-sm">
+              <span className="px-3 py-1 bg-white/10 rounded border border-white/20">WASD / ARROWS</span>
+            </div>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-[10px] text-blue-400 uppercase tracking-widest font-bold">Jetpack</span>
+            <div className="flex gap-2 font-mono text-sm">
+              <span className="px-3 py-1 bg-white/10 rounded border border-white/20">SPACE (Hold)</span>
+            </div>
+          </div>
+          <div className="flex flex-col items-center gap-2 col-span-2">
+            <span className="text-[10px] text-blue-400 uppercase tracking-widest font-bold">Combat</span>
+            <div className="flex gap-2 font-mono text-sm">
+              <span className="px-3 py-1 bg-white/10 rounded border border-white/20">LEFT MOUSE / TOUCH - SHOOT</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="w-64 h-1 bg-white/10 rounded-full overflow-hidden">
+           <div className="h-full bg-blue-500 animate-[loading_2s_ease-in-out_infinite]" />
+        </div>
+      </div>
+      
+      <style>{`
+        @keyframes loading {
+          0% { width: 0; transform: translateX(0); }
+          50% { width: 100%; transform: translateX(0); }
+          100% { width: 0; transform: translateX(100%); }
+        }
+      `}</style>
     </div>
   );
-}
+};
+
+export default App;
